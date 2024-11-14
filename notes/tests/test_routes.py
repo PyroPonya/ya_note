@@ -1,81 +1,31 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.urls import reverse
 
-from notes.models import Note
+from .abstract_test_case import AbstractTestCase
 
 User = get_user_model()
 
 
-class TestRoutes(TestCase):
+class TestRoutes(AbstractTestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.user = User.objects.create_user(
-            username='user',
-        )
-        cls.author = User.objects.create_user(
-            username='author',
-        )
-        cls.note = Note.objects.create(
-            title='title',
-            text='body',
-            author=cls.author,
-        )
+        super().setUpTestData()
 
-    # Главная страница доступна анонимному пользователю.
-    def test_home_page_anonymous(self):
-        response = self.client.get(reverse('notes:home'))
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    # Аутентифицированному пользователю доступна страница со списком заметок notes/, страница успешного добавления заметки done/, страница добавления новой заметки add/.
-    def test_pages_availability_for_auth_user(self):
-        self.client.force_login(self.user)
-        urls = (
-            reverse('notes:list'),
-            reverse('notes:success'),
-            reverse('notes:add'),
-        )
-        for url in urls:
-            with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    # Страницы отдельной заметки, удаления и редактирования заметки доступны только автору заметки. Если на эти страницы попытается зайти другой пользователь — вернётся ошибка 404.
-    def test_notes_availability_for_author(self):
-        urls = (
-            reverse('notes:detail', args=(self.note.slug,)),
-            reverse('notes:edit', args=(self.note.slug,)),
-            reverse('notes:delete', args=(self.note.slug,)),
-        )
-        self.client.force_login(self.author)
-        for url in urls:
-            with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
-
-    def test_notes_availability_for_not_author(self):
-        urls = (
-            reverse('notes:detail', args=(self.note.slug,)),
-            reverse('notes:edit', args=(self.note.slug,)),
-            reverse('notes:delete', args=(self.note.slug,)),
-        )
-        self.client.force_login(self.user)
-        for url in urls:
-            with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-
-    # При попытке перейти на страницу списка заметок, страницу успешного добавления записи, страницу добавления заметки, отдельной заметки, редактирования или удаления заметки анонимный пользователь перенаправляется на страницу логина.
     def test_redirects(self):
+        """При попытке перейти на страницу списка заметок,
+        страницу успешного добавления записи,
+        страницу добавления заметки, отдельной заметки,
+        редактирования или удаления заметки
+        анонимный пользователь перенаправляется на страницу логина.
+        """
         urls = (
-            reverse('notes:list'),
-            reverse('notes:success'),
-            reverse('notes:add'),
-            reverse('notes:detail', args=(self.note.slug,)),
-            reverse('notes:edit', args=(self.note.slug,)),
-            reverse('notes:delete', args=(self.note.slug,)),
+            self.NOTES_LIST_URL,
+            self.NOTES_SUCCESS_URL,
+            self.NOTES_ADD_URL,
+            self.NOTES_DETAIL_URL,
+            self.NOTES_EDIT_URL,
+            self.NOTES_DELETE_URL,
         )
         for url in urls:
             with self.subTest(url=url):
@@ -83,14 +33,150 @@ class TestRoutes(TestCase):
                 redirect_url = f'/auth/login/?next={url}'
                 self.assertRedirects(response, redirect_url)
 
-    # Страницы регистрации пользователей, входа в учётную запись и выхода из неё доступны всем пользователям.
-    def test_pages_availability_for_all_users(self):
-        urls = (
-            reverse('users:signup'),
-            reverse('users:login'),
-            reverse('users:logout'),
-        )
-        for url in urls:
-            with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, HTTPStatus.OK)
+    def test_pages_availability(self):
+        """
+        PS - надеюсь, я правильно понял твою мысль из рекомендации)).
+        Порядок: client => author_client => user_client.
+
+        Главная страница доступна анонимному пользователю.
+        Аутентифицированному пользователю доступна страница
+        со списком заметок notes/,
+        страница успешного добавления заметки done/,
+        страница добавления новой заметки add/.
+        Страницы отдельной заметки, удаления и редактирования заметки
+        доступны только автору заметки.
+        Если на эти страницы попытается зайти другой пользователь
+        — вернётся ошибка 404.
+        Страницы регистрации пользователей,
+        входа в учётную запись и выхода из неё
+        доступны всем пользователям.
+        """
+        data = [
+            {
+                'url': self.NOTES_HOME_URL,
+                'client': self.client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_SIGNUP_URL,
+                'client': self.client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_LOGIN_URL,
+                'client': self.client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_LOGOUT_URL,
+                'client': self.client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_HOME_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_LIST_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_ADD_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_DETAIL_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_EDIT_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_DELETE_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_SUCCESS_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_SIGNUP_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_LOGIN_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_LOGOUT_URL,
+                'client': self.author_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_HOME_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_LIST_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_ADD_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.NOTES_DETAIL_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.NOT_FOUND
+            },
+            {
+                'url': self.NOTES_EDIT_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.NOT_FOUND
+            },
+            {
+                'url': self.NOTES_DELETE_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.NOT_FOUND
+            },
+            {
+                'url': self.NOTES_SUCCESS_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_SIGNUP_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_LOGIN_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            },
+            {
+                'url': self.USERS_LOGOUT_URL,
+                'client': self.user_client,
+                'status_code': HTTPStatus.OK
+            }
+        ]
+        for item in data:
+            with self.subTest(url=item['url']):
+                response = item['client'].get(item['url'])
+                self.assertEqual(response.status_code, item['status_code'])
+                if item['status_code'] == HTTPStatus.FOUND:
+                    prep_url = '/auth/login/?next=' + item['url']
+                    self.assertRedirects(response, prep_url)
