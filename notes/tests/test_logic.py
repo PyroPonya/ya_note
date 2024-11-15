@@ -20,8 +20,8 @@ class TestLogic(AbstractTestCase):
             'slug': cls.note.slug
         }
         cls.new_form_data = {
-            'title': 'New Title',
-            'text': 'New Text',
+            'title': 'обновленная_заметка',
+            'text': 'обновленный_текст',
         }
 
     def test_user_can_create_note(self):
@@ -92,7 +92,7 @@ class TestLogic(AbstractTestCase):
         note = Note.objects.get(id=self.note.id)
         self.assertEqual(
             (note.title, note.text),
-            (self.old_form_data['title'], self.old_form_data['text'])
+            (self.note.title, self.note.text)
         )
 
     def test_user_can_delete_note(self):
